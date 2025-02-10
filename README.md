@@ -2,6 +2,10 @@
 
 A user-friendly Python application that displays comprehensive information about your computer system in an easy-to-understand format. Developed by PealK Tech.
 
+## Motivation
+
+This project was inspired by and dedicated to "swadeONLINE" and his commitment to teaching Linux fundamentals to students. His teaching methods and passion for Linux education motivated the creation of this tool to help students better understand their systems.
+
 ## Features
 
 - 🖥️ Hardware Information
@@ -46,7 +50,7 @@ _a2a/
 
 1. Clone this repository:
 ```bash
-git clone https://github.com/PealKTech/_a2a
+git clone https://github.com/Kelvin-Charles/_a2a
 cd _a2a
 ```
 
@@ -80,15 +84,70 @@ The information will be displayed in an organized, easy-to-read format with opti
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+We warmly welcome contributions from everyone! Whether you're fixing bugs, adding new features, improving documentation, or suggesting ideas, your help is appreciated.
+
+### How to Contribute
+
+1. Fork the repository
+2. Create your feature branch:
+```bash
+git checkout -b feature/YourFeature
+```
+
+3. Commit your changes:
+```bash
+git commit -m 'Add some feature'
+```
+
+4. Push to the branch:
+```bash
+git push origin feature/YourFeature
+```
+
+5. Open a Pull Request
+
+### Contribution Guidelines
+
+- Keep code clean and well-documented
+- Test your changes thoroughly
+- Update documentation if needed
+- Follow existing code style
+- Add comments for complex logic
+- Include descriptive commit messages
+
+### Areas for Improvement
+
+- Additional hardware detection methods
+- Support for more Linux distributions
+- New system information metrics
+- Performance optimizations
+- UI/UX enhancements
+- Additional export formats
+- Localization support
+
+We believe in the power of community-driven development and look forward to your contributions!
 
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
+## Contact
+
+- Developer: Kelvin Charles
+- Email: pearlktech@gmail.com
+- Phone: +255623391284
+- GitHub: https://github.com/Kelvin-Charles
+
 ## About
 
 Developed by PealK Tech  
 Version: 1.0.0  
-GitHub: https://github.com/PealKTech
+Copyright © 2024 PealK Tech. All rights reserved.
+
+## Acknowledgments
+
+Special thanks to:
+- swadeONLINE for inspiring this project through his Linux fundamentals teaching
+- All contributors who help improve this tool
+- The open-source community for providing the amazing libraries used in this project
 
