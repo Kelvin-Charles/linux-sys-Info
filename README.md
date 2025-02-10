@@ -133,7 +133,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Contact
 
-- Developer: Kelvin Charles
+- Developer: PealK Tech
 - Email: pearlktech@gmail.com
 - Phone: +255623391284
 - GitHub: https://github.com/Kelvin-Charles
@@ -142,7 +142,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 Developed by PealK Tech  
 Version: 1.0.0  
-Copyright © 2024 PealK Tech. All rights reserved.
+Copyright © 2025 PealK Tech. All rights reserved.
 
 ## Acknowledgments
 
