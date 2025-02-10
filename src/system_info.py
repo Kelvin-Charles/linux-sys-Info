@@ -17,6 +17,7 @@ from rich import box
 import time
 from rich.text import Text
 from src import task_manager
+from src import user_manager
 
 console = Console()
 
@@ -32,8 +33,9 @@ class SystemInfoViewer:
             "3. Network Information\n"
             "4. System Information\n"
             "5. Task Manager\n"
-            "6. Export Information\n"
-            "7. Exit",
+            "6. User Manager\n"
+            "7. Export Information\n"
+            "8. Exit",
             title="Menu"
         ))
         
@@ -297,7 +299,7 @@ class SystemInfoViewer:
         
         while True:
             self.display_menu()
-            choice = input("Enter your choice (1-7): ")
+            choice = input("Enter your choice (1-8): ")
             
             if choice == "1":
                 self.show_all_info()
@@ -310,8 +312,18 @@ class SystemInfoViewer:
             elif choice == "5":
                 task_manager.run_task_manager()
             elif choice == "6":
-                self.export_info()
+                if os.geteuid() == 0:
+                    user_manager.run_user_manager()
+                else:
+                    # Try to get sudo access
+                    password = utils.get_sudo_password()
+                    if password:
+                        user_manager.run_user_manager()
+                    else:
+                        console.print("[red]User management requires root privileges![/red]")
             elif choice == "7":
+                self.export_info()
+            elif choice == "8":
                 console.print("[yellow]Thank you for using _a2a![/yellow]")
                 break
             else:

@@ -2,6 +2,8 @@ import os
 import json
 from datetime import datetime
 from rich.console import Console
+import subprocess
+import getpass
 
 console = Console()
 
@@ -39,3 +41,20 @@ def format_bytes(bytes):
         if bytes < 1024:
             return f"{bytes:.2f} {unit}"
         bytes /= 1024 
+
+def get_sudo_password():
+    try:
+        password = getpass.getpass("[yellow]Root privileges required. Enter sudo password: [/yellow]")
+        # Test the password
+        cmd = ['sudo', '-S', 'true']
+        process = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+        process.communicate(password.encode())
+        
+        if process.returncode == 0:
+            return password
+        else:
+            console.print("[red]Incorrect password![/red]")
+            return None
+    except Exception as e:
+        console.print(f"[red]Error getting sudo password: {str(e)}[/red]")
+        return None 
