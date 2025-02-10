@@ -1,0 +1,15 @@
+linux-sys-info/
+├── LICENSE
+├── MANIFEST.in
+├── README.md
+├── requirements.txt
+├── setup.py
+└── src/
+    ├── __init__.py
+    ├── hardware_info.py
+    ├── network_info.py
+    ├── network_manager.py
+    ├── system_info.py
+    ├── task_manager.py
+    ├── user_manager.py
+    └── utils.py 

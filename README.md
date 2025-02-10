@@ -54,6 +54,18 @@ This project was inspired by and dedicated to "swadeONLINE" and his commitment t
 
 ## Installation
 
+### Method 1: Using pip (Recommended)
+
+```bash
+# Install directly from GitHub
+pip3 install git+https://github.com/YOUR_USERNAME/linux-sys-info.git
+
+# Run the application
+a2a
+```
+
+### Method 2: Manual Installation
+
 1. Fork the repository:
    - Click the 'Fork' button at the top right of this page
    - Clone your forked repository:
@@ -62,9 +74,32 @@ git clone https://github.com/YOUR_USERNAME/linux-sys-info
 cd linux-sys-info
 ```
 
-2. Install required packages:
+2. Install the package:
 ```bash
-pip3 install -r requirements.txt
+# Install in development mode
+pip3 install -e .
+
+# Or install normally
+pip3 install .
+```
+
+3. Run the application:
+```bash
+a2a
+```
+
+### Method 3: System-wide Installation (requires root)
+
+```bash
+# Clone the repository
+git clone https://github.com/YOUR_USERNAME/linux-sys-info
+cd linux-sys-info
+
+# Install system-wide
+sudo pip3 install .
+
+# Run the application
+a2a
 ```
 
 ## Usage
