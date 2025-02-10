@@ -18,6 +18,7 @@ import time
 from rich.text import Text
 from src import task_manager
 from src import user_manager
+from src import network_manager
 
 console = Console()
 
@@ -34,8 +35,9 @@ class SystemInfoViewer:
             "4. System Information\n"
             "5. Task Manager\n"
             "6. User Manager\n"
-            "7. Export Information\n"
-            "8. Exit",
+            "7. Network Manager\n"
+            "8. Export Information\n"
+            "9. Exit",
             title="Menu"
         ))
         
@@ -237,11 +239,11 @@ class SystemInfoViewer:
         """
         
         company = """
-         ____  _____    _    _     _  __   _____ _____ ____ _   _ 
-        |  _ \\| ____|  / \\  | |   | |/ /  |_   _| ____/ ___| | | |
-        | |_) |  _|   / _ \\ | |   | ' /     | | |  _|| |   | |_| |
-        |  __/| |___ / ___ \\| |___| . \\     | | | |__| |___|  _  |
-        |_|   |_____/_/   \\_\\_____|_|\\_\\    |_| |_____|\\____|_| |_|
+         ____  _____    _    ____  _     _  __   _____ _____ ____ _   _ 
+        |  _ \\| ____|  / \\  |  _ \\| |   | |/ /  |_   _| ____/ ___| | | |
+        | |_) |  _|   / _ \\ | |_) | |   | ' /     | | |  _|| |   | |_| |
+        |  __/| |___ / ___ \\|  _ <| |___| . \\     | | | |__| |___|  _  |
+        |_|   |_____/_/   \\_\\_| \\_\\_____|_|\\_\\    |_| |_____|\\____|_| |_|
         """
         
         # Animation frames for loading
@@ -284,7 +286,7 @@ class SystemInfoViewer:
                     padding=(1, 2),
                     title=" _A2A ",
                     title_align="center",
-                    subtitle="[ PealK Tech ]",
+                    subtitle="[ PearlK Tech ]",
                     subtitle_align="center"
                 )
                 
@@ -299,7 +301,7 @@ class SystemInfoViewer:
         
         while True:
             self.display_menu()
-            choice = input("Enter your choice (1-8): ")
+            choice = input("Enter your choice (1-9): ")
             
             if choice == "1":
                 self.show_all_info()
@@ -315,15 +317,23 @@ class SystemInfoViewer:
                 if os.geteuid() == 0:
                     user_manager.run_user_manager()
                 else:
-                    # Try to get sudo access
                     password = utils.get_sudo_password()
                     if password:
                         user_manager.run_user_manager()
                     else:
                         console.print("[red]User management requires root privileges![/red]")
             elif choice == "7":
-                self.export_info()
+                if os.geteuid() == 0:
+                    network_manager.run_network_manager()
+                else:
+                    password = utils.get_sudo_password()
+                    if password:
+                        network_manager.run_network_manager()
+                    else:
+                        console.print("[red]Network management requires root privileges![/red]")
             elif choice == "8":
+                self.export_info()
+            elif choice == "9":
                 console.print("[yellow]Thank you for using _a2a![/yellow]")
                 break
             else:

@@ -1,6 +1,6 @@
 # Linux System Info
 
-A comprehensive Linux system management tool that provides detailed system information and user management capabilities in an easy-to-understand format. Developed by PealK Tech.
+A comprehensive Linux system management tool that provides detailed system information and user management capabilities in an easy-to-understand format. Developed by PearlK Tech.
 
 ## Motivation
 
@@ -138,16 +138,16 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Contact
 
-- Developer: PealK Tech
+- Developer: PearlK Tech
 - Email: pearlktech@gmail.com
 - Phone: +255623391284
 - GitHub: https://github.com/Kelvin-Charles
 
 ## About
 
-Developed by PealK Tech  
+Developed by PearlK Tech  
 Version: 1.0.0  
-Copyright © 2025 PealK Tech. All rights reserved.
+Copyright © 2025 PearlK Tech. All rights reserved.
 
 ## Acknowledgments
 
