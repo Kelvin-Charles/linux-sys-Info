@@ -16,6 +16,7 @@ from rich.align import Align
 from rich import box
 import time
 from rich.text import Text
+from src import task_manager
 
 console = Console()
 
@@ -30,8 +31,9 @@ class SystemInfoViewer:
             "2. Hardware Information\n"
             "3. Network Information\n"
             "4. System Information\n"
-            "5. Export Information\n"
-            "6. Exit",
+            "5. Task Manager\n"
+            "6. Export Information\n"
+            "7. Exit",
             title="Menu"
         ))
         
@@ -295,7 +297,7 @@ class SystemInfoViewer:
         
         while True:
             self.display_menu()
-            choice = input("Enter your choice (1-6): ")
+            choice = input("Enter your choice (1-7): ")
             
             if choice == "1":
                 self.show_all_info()
@@ -306,8 +308,10 @@ class SystemInfoViewer:
             elif choice == "4":
                 self.show_system_info()
             elif choice == "5":
-                self.export_info()
+                task_manager.run_task_manager()
             elif choice == "6":
+                self.export_info()
+            elif choice == "7":
                 console.print("[yellow]Thank you for using _a2a![/yellow]")
                 break
             else:
