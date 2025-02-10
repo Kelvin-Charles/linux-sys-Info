@@ -230,11 +230,11 @@ class SystemInfoViewer:
         
         # Create the banner text with capital letters
         banner = """
-          _    ___    _    
-         / \\  |__ \\  / \\   
-        / _ \\   ) |/ _ \\  
-       / ___ \\ / // ___ \\ 
-      /_/   \\/_//_/   \\_\\
+              _     ___   _    
+             / \\  |__ \\/ \\   
+            / _ \\   ) |/ _ \\  
+    ______ / ___ \\ / // ___ \\ 
+   |_____ /_/   \\/_//_/   \\_\\
         SYSTEM INFO VIEWER
         """
         
@@ -250,10 +250,10 @@ class SystemInfoViewer:
         frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
         
         # Colors for animation
-        colors = ["red", "yellow", "green", "blue", "magenta", "cyan"]
+        colors = ["red", "yellow", "green", "blue", "magenta", "cyan","white",]
         company_colors = ["bright_red", "bright_yellow", "bright_magenta"]
         
-        with Live(refresh_per_second=10) as live:
+        with Live(refresh_per_second=7) as live:
             for i in range(60):  # Show animation for 6 seconds
                 color = colors[i % len(colors)]
                 company_color = company_colors[i % len(company_colors)]
@@ -291,7 +291,7 @@ class SystemInfoViewer:
                 )
                 
                 live.update(panel)
-                time.sleep(0.1)
+                time.sleep(0.3)
         
         # Clear screen after animation
         console.clear()

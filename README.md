@@ -191,3 +191,8 @@ Special thanks to:
 - All contributors who help improve this tool
 - The open-source community for providing the amazing libraries used in this project
 
+## Statistics
+![GitHub Clones](https://img.shields.io/github/clones/Kelvin-Charles/linux-sys-info?label=Clones&style=social)
+![GitHub Stars](https://img.shields.io/github/stars/Kelvin-Charles/linux-sys-info?style=social)
+![GitHub Forks](https://img.shields.io/github/forks/Kelvin-Charles/linux-sys-info?style=social)
+
