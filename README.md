@@ -58,7 +58,7 @@ This project was inspired by and dedicated to "swadeONLINE" and his commitment t
 
 ```bash
 # Install directly from GitHub
-pip3 install git+https://github.com/YOUR_USERNAME/linux-sys-info.git
+pip3 install git+https://github.com/Kelvin-Charles/linux-sys-info.git
 
 # Run the application
 a2a
@@ -92,7 +92,7 @@ a2a
 
 ```bash
 # Clone the repository
-git clone https://github.com/YOUR_USERNAME/linux-sys-info
+git clone https://github.com/Kelvin-Charles/linux-sys-info
 cd linux-sys-info
 
 # Install system-wide
