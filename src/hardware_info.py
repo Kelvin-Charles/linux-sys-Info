@@ -1,6 +1,5 @@
 import psutil
 import cpuinfo
-import GPUtil
 import platform
 import os
 import subprocess
@@ -77,30 +76,35 @@ def get_gpu_info():
     table.add_column("Value", style="green")
     
     try:
-        gpus = GPUtil.getGPUs()
-        if gpus:
-            for i, gpu in enumerate(gpus):
-                table.add_row(f"GPU {i+1} Name", str(gpu.name))
-                table.add_row(f"GPU {i+1} Driver", str(gpu.driver))
-                table.add_row(f"GPU {i+1} Memory Total", f"{gpu.memoryTotal} MB")
-                table.add_row(f"GPU {i+1} Memory Used", f"{gpu.memoryUsed} MB")
-                table.add_row(f"GPU {i+1} Memory Free", f"{gpu.memoryFree} MB")
-                table.add_row(f"GPU {i+1} Temperature", f"{gpu.temperature} °C")
-                table.add_row(f"GPU {i+1} Load", f"{gpu.load * 100:.1f}%")
+        # Try using lspci command first (for Linux)
+        if platform.system() == "Linux":
+            gpu_info = subprocess.check_output("lspci | grep -E 'VGA|3D|2D'", shell=True).decode()
+            for line in gpu_info.split('\n'):
+                if line.strip():
+                    # Extract controller name after the first colon
+                    if ': ' in line:
+                        controller = line.split(': ')[1].strip()
+                        table.add_row("GPU", controller)
+        
+        # For Windows, try using WMI
+        elif platform.system() == "Windows":
+            try:
+                import wmi
+                w = wmi.WMI()
+                for gpu in w.Win32_VideoController():
+                    table.add_row("Name", gpu.Name)
+                    table.add_row("Video Processor", gpu.VideoProcessor)
+                    table.add_row("Driver Version", gpu.DriverVersion)
+                    table.add_row("Video Memory", f"{gpu.AdapterRAM / (1024**3):.2f} GB" if gpu.AdapterRAM else "Unknown")
+            except ImportError:
+                table.add_row("GPU", "WMI module not available")
+        
+        # Fallback for other systems
         else:
-            # Try to get GPU info using lspci on Linux
-            if platform.system() == "Linux":
-                try:
-                    gpu_info = subprocess.check_output("lspci | grep -i 'vga\|3d\|2d'", shell=True).decode()
-                    for line in gpu_info.split('\n'):
-                        if line.strip():
-                            table.add_row("GPU", line.split(': ')[1] if ': ' in line else line)
-                except:
-                    table.add_row("GPU Information", "No GPU information available")
-            else:
-                table.add_row("GPU Information", "No GPU information available")
+            table.add_row("GPU", "System not supported")
+            
     except Exception as e:
-        table.add_row("Error", f"Unable to fetch GPU info: {str(e)}")
+        table.add_row("Error", f"Could not detect GPU: {str(e)}")
     
     return table
 

@@ -1,15 +1,15 @@
 import pwd
 import grp
 import subprocess
-import crypt
 import os
 from rich.table import Table
 from rich.console import Console
 from rich.panel import Panel
 from rich import box
 from datetime import datetime
-import spwd
-from src.utils import get_sudo_password
+import hashlib
+import base64
+import secrets
 
 console = Console()
 
@@ -248,11 +248,6 @@ class UserManager:
             # Get basic user info
             user = pwd.getpwnam(username)
             
-            # Get shadow info using sudo
-            shadow_cmd = ['sudo', 'getent', 'shadow', username]
-            shadow_output = subprocess.check_output(shadow_cmd, text=True)
-            shadow_fields = shadow_output.strip().split(':')
-            
             table = Table(title=f"User Details - {username}")
             table.add_column("Property", style="cyan")
             table.add_column("Value", style="green")
@@ -269,42 +264,50 @@ class UserManager:
             groups = groups_output.split(':')[1].strip().split()
             table.add_row("Groups", ', '.join(groups))
             
-            # Password status
-            if shadow_fields[1].startswith('!'):
-                pwd_status = "Locked"
-            elif shadow_fields[1].startswith('*'):
-                pwd_status = "Disabled"
-            else:
-                pwd_status = "Active"
-            table.add_row("Password Status", pwd_status)
-            
-            # Last password change
-            last_change = int(shadow_fields[2])
-            if last_change > 0:
-                change_date = datetime.fromtimestamp(last_change * 86400).strftime("%Y-%m-%d")
-                table.add_row("Last Password Change", change_date)
-            else:
-                table.add_row("Last Password Change", "Never")
-            
-            # Add password aging information
-            if len(shadow_fields) >= 8:
-                min_days = shadow_fields[3]
-                max_days = shadow_fields[4]
-                warn_days = shadow_fields[5]
-                inactive_days = shadow_fields[6]
-                expire_date = shadow_fields[7]
+            # Get password status using sudo
+            shadow_cmd = ['sudo', 'getent', 'shadow', username]
+            try:
+                shadow_output = subprocess.check_output(shadow_cmd, text=True)
+                shadow_fields = shadow_output.strip().split(':')
                 
-                if min_days and min_days != "0":
-                    table.add_row("Minimum Password Age", f"{min_days} days")
-                if max_days and max_days != "99999":
-                    table.add_row("Maximum Password Age", f"{max_days} days")
-                if warn_days and warn_days != "7":
-                    table.add_row("Password Warning Period", f"{warn_days} days")
-                if inactive_days and inactive_days != "-1":
-                    table.add_row("Password Inactivity Period", f"{inactive_days} days")
-                if expire_date and expire_date != "-1":
-                    expire = datetime.fromtimestamp(int(expire_date) * 86400).strftime("%Y-%m-%d")
-                    table.add_row("Account Expiration Date", expire)
+                # Password status
+                if shadow_fields[1].startswith('!'):
+                    pwd_status = "Locked"
+                elif shadow_fields[1].startswith('*'):
+                    pwd_status = "Disabled"
+                else:
+                    pwd_status = "Active"
+                table.add_row("Password Status", pwd_status)
+                
+                # Last password change
+                last_change = int(shadow_fields[2])
+                if last_change > 0:
+                    change_date = datetime.fromtimestamp(last_change * 86400).strftime("%Y-%m-%d")
+                    table.add_row("Last Password Change", change_date)
+                else:
+                    table.add_row("Last Password Change", "Never")
+                
+                # Add password aging information
+                if len(shadow_fields) >= 8:
+                    min_days = shadow_fields[3]
+                    max_days = shadow_fields[4]
+                    warn_days = shadow_fields[5]
+                    inactive_days = shadow_fields[6]
+                    expire_date = shadow_fields[7]
+                    
+                    if min_days and min_days != "0":
+                        table.add_row("Minimum Password Age", f"{min_days} days")
+                    if max_days and max_days != "99999":
+                        table.add_row("Maximum Password Age", f"{max_days} days")
+                    if warn_days and warn_days != "7":
+                        table.add_row("Password Warning Period", f"{warn_days} days")
+                    if inactive_days and inactive_days != "-1":
+                        table.add_row("Password Inactivity Period", f"{inactive_days} days")
+                    if expire_date and expire_date != "-1":
+                        expire = datetime.fromtimestamp(int(expire_date) * 86400).strftime("%Y-%m-%d")
+                        table.add_row("Account Expiration Date", expire)
+            except subprocess.CalledProcessError:
+                table.add_row("Password Info", "Unable to fetch password information")
             
             # Get last login info using sudo
             try:
@@ -478,86 +481,159 @@ class UserManager:
         except Exception as e:
             console.print(f"[red]Error modifying user: {str(e)}[/red]")
 
+def generate_password_hash(password):
+    """Generate a secure password hash using modern methods"""
+    # Generate a random salt
+    salt = secrets.token_hex(8)
+    # Combine password and salt
+    salted = (salt + password).encode('utf-8')
+    # Generate hash using SHA-256
+    hash_obj = hashlib.sha256(salted)
+    # Combine salt and hash in base64
+    return f"$6${salt}${base64.b64encode(hash_obj.digest()).decode()}"
+
+def add_user(username, password=None, create_home=True, groups=None):
+    """Add a new user to the system"""
+    try:
+        cmd = ['useradd']
+        
+        if create_home:
+            cmd.append('-m')  # Create home directory
+            
+        if groups:
+            cmd.extend(['-G', ','.join(groups)])
+            
+        cmd.append(username)
+        
+        # Execute useradd command
+        subprocess.run(cmd, check=True)
+        
+        # Set password if provided
+        if password:
+            # Use chpasswd instead of directly manipulating /etc/shadow
+            proc = subprocess.Popen(['chpasswd'], stdin=subprocess.PIPE)
+            proc.communicate(input=f'{username}:{password}\n'.encode())
+            
+        return True, f"User {username} created successfully"
+    except subprocess.CalledProcessError as e:
+        return False, f"Failed to create user: {str(e)}"
+    except Exception as e:
+        return False, f"Error creating user: {str(e)}"
+
+def delete_user(username, remove_home=False):
+    """Delete a user from the system"""
+    try:
+        cmd = ['userdel']
+        if remove_home:
+            cmd.append('-r')
+        cmd.append(username)
+        
+        subprocess.run(cmd, check=True)
+        return True, f"User {username} deleted successfully"
+    except subprocess.CalledProcessError as e:
+        return False, f"Failed to delete user: {str(e)}"
+    except Exception as e:
+        return False, f"Error deleting user: {str(e)}"
+
+def modify_user(username, new_groups=None, new_shell=None):
+    """Modify an existing user"""
+    try:
+        if new_groups:
+            subprocess.run(['usermod', '-G', ','.join(new_groups), username], check=True)
+        
+        if new_shell:
+            subprocess.run(['chsh', '-s', new_shell, username], check=True)
+            
+        return True, f"User {username} modified successfully"
+    except subprocess.CalledProcessError as e:
+        return False, f"Failed to modify user: {str(e)}"
+    except Exception as e:
+        return False, f"Error modifying user: {str(e)}"
+
+def list_users():
+    """List all users on the system"""
+    table = Table(title="System Users")
+    table.add_column("Username", style="cyan")
+    table.add_column("UID", style="green")
+    table.add_column("GID", style="yellow")
+    table.add_column("Home Directory", style="blue")
+    table.add_column("Shell", style="magenta")
+    table.add_column("Groups", style="red")
+    
+    try:
+        for user in pwd.getpwall():
+            # Get groups for user
+            groups = [g.gr_name for g in grp.getgrall() if user.pw_name in g.gr_mem]
+            # Add primary group
+            try:
+                primary_group = grp.getgrgid(user.pw_gid).gr_name
+                if primary_group not in groups:
+                    groups.append(primary_group)
+            except KeyError:
+                pass
+            
+            table.add_row(
+                user.pw_name,
+                str(user.pw_uid),
+                str(user.pw_gid),
+                user.pw_dir,
+                user.pw_shell,
+                ", ".join(groups)
+            )
+    except Exception as e:
+        console.print(f"[red]Error listing users: {str(e)}[/red]")
+        return None
+    
+    return table
+
 def run_user_manager():
-    user_manager = UserManager()
-    show_all_users = True
-    
-    # Get sudo password at startup
-    if not user_manager.ensure_sudo():
-        console.print("[red]Root privileges required to manage users and groups![/red]")
-        return
-    
+    """Main function to run the user manager"""
     while True:
         console.clear()
-        console.print("\n[bold cyan]User and Group Management[/bold cyan]")
-        console.print("[1] List All Users")
-        console.print("[2] List Real Users Only")
-        console.print("[3] List All Groups")
-        console.print("[4] Add User")
-        console.print("[5] Delete User")
-        console.print("[6] Change User Password")
-        console.print("[7] Add Group")
-        console.print("[8] Delete Group")
-        console.print("[9] Add User to Group")
-        console.print("[10] Remove User from Group")
-        console.print("[11] Modify User")
-        console.print("[12] Show User Details")
-        console.print("[13] Exit")
+        console.print("""[bold blue]User Manager[/bold blue]
+1. List Users
+2. Add User
+3. Delete User
+4. Modify User
+5. Back to Main Menu
+""")
         
-        choice = input("\nEnter your choice (1-13): ")
+        choice = input("Enter your choice (1-5): ")
         
         if choice == "1":
-            console.print(user_manager.list_users(show_all=True))
+            table = list_users()
+            if table:
+                console.print(table)
+                
         elif choice == "2":
-            console.print(user_manager.list_users(show_all=False))
-        elif choice == "3":
-            console.print(user_manager.list_groups())
-        elif choice == "4":
             username = input("Enter username: ")
-            password = input("Enter password (leave blank for none): ")
+            password = input("Enter password (leave blank for no password): ")
             create_home = input("Create home directory? (y/n): ").lower() == 'y'
-            shell = input("Enter shell (default: /bin/bash): ") or "/bin/bash"
-            user_manager.add_user(username, password, create_home, shell)
-        elif choice == "5":
-            username = input("Enter username: ")
+            groups = input("Enter groups (comma-separated, leave blank for none): ")
+            
+            groups = [g.strip() for g in groups.split(',')] if groups else None
+            success, message = add_user(username, password, create_home, groups)
+            console.print(f"[{'green' if success else 'red'}]{message}[/{'green' if success else 'red'}]")
+            
+        elif choice == "3":
+            username = input("Enter username to delete: ")
             remove_home = input("Remove home directory? (y/n): ").lower() == 'y'
-            user_manager.delete_user(username, remove_home)
-        elif choice == "6":
-            username = input("Enter username: ")
-            password = input("Enter new password: ")
-            user_manager.change_password(username, password)
-        elif choice == "7":
-            groupname = input("Enter group name: ")
-            user_manager.add_group(groupname)
-        elif choice == "8":
-            groupname = input("Enter group name: ")
-            user_manager.delete_group(groupname)
-        elif choice == "9":
-            username = input("Enter username: ")
-            groupname = input("Enter group name: ")
-            user_manager.add_user_to_group(username, groupname)
-        elif choice == "10":
-            username = input("Enter username: ")
-            groupname = input("Enter group name: ")
-            user_manager.remove_user_from_group(username, groupname)
-        elif choice == "11":
-            username = user_manager.select_user(action="modify")
-            if username:
-                new_shell = input("Enter new shell (leave blank to skip): ")
-                new_home = input("Enter new home directory (leave blank to skip): ")
-                new_groups = input("Enter new groups (comma-separated, leave blank to skip): ")
-                if new_groups:
-                    new_groups = new_groups.split(',')
-                user_manager.modify_user(username, new_shell or None, new_home or None, new_groups)
-        elif choice == "12":
-            username = user_manager.select_user(action="view")
-            if username:
-                details = user_manager.show_user_details(username)
-                if details:
-                    console.print(details)
-        elif choice == "13":
+            
+            success, message = delete_user(username, remove_home)
+            console.print(f"[{'green' if success else 'red'}]{message}[/{'green' if success else 'red'}]")
+            
+        elif choice == "4":
+            username = input("Enter username to modify: ")
+            groups = input("Enter new groups (comma-separated, leave blank to skip): ")
+            shell = input("Enter new shell (leave blank to skip): ")
+            
+            groups = [g.strip() for g in groups.split(',')] if groups else None
+            success, message = modify_user(username, groups, shell)
+            console.print(f"[{'green' if success else 'red'}]{message}[/{'green' if success else 'red'}]")
+            
+        elif choice == "5":
             break
-        
+            
         input("\nPress Enter to continue...")
 
 if __name__ == "__main__":

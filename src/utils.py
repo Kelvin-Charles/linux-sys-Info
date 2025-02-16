@@ -200,18 +200,22 @@ def format_bytes(bytes):
         bytes /= 1024
 
 def get_sudo_password():
+    """Get sudo password from user"""
     try:
-        password = getpass.getpass("[yellow]Root privileges required. Enter sudo password: [/yellow]")
-        # Test the password
-        cmd = ['sudo', '-S', 'true']
-        process = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
-        process.communicate(password.encode())
-        
-        if process.returncode == 0:
+        import getpass
+        password = getpass.getpass("[yellow]Please enter sudo password: [/yellow]")
+        # Verify password
+        test = subprocess.run(
+            ['sudo', '-S', 'true'],
+            input=password.encode(),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+        if test.returncode == 0:
             return password
         else:
-            console.print("[red]Incorrect password![/red]")
+            console.print("[red]Incorrect password[/red]")
             return None
-    except Exception as e:
-        console.print(f"[red]Error getting sudo password: {str(e)}[/red]")
+    except:
+        console.print("[red]Failed to get sudo access[/red]")
         return None 

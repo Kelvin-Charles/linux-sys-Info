@@ -20,13 +20,43 @@ from src import task_manager
 from src import user_manager
 from src import network_manager
 import re
+from src.utils import get_sudo_password
 
 console = Console()
 
 class SystemInfoViewer:
     def __init__(self):
         self.console = Console()
+        self.sudo_password = None
         
+    def ensure_sudo(self):
+        """Ensure sudo access is available and get password if needed"""
+        if self.sudo_password is None:
+            self.console.print("[yellow]Some operations require administrative privileges.[/yellow]")
+            self.sudo_password = get_sudo_password()
+        return self.sudo_password is not None
+
+    def run_sudo_command(self, cmd, input_data=None):
+        """Run a command with sudo"""
+        if not self.ensure_sudo():
+            return False, None, "No sudo access"
+        
+        sudo_cmd = ['sudo', '-S'] + (cmd if isinstance(cmd, list) else cmd.split())
+        process = subprocess.Popen(
+            sudo_cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+        
+        # Send password first, then any input data
+        input_text = f"{self.sudo_password}\n"
+        if input_data:
+            input_text += input_data
+        
+        stdout, stderr = process.communicate(input_text.encode())
+        return process.returncode == 0, stdout, stderr
+
     def display_menu(self):
         console.print(Panel.fit(
             "[bold blue]System Information Viewer[/bold blue]\n"
@@ -136,42 +166,150 @@ class SystemInfoViewer:
         
         return table
 
+    def get_distro_info(self):
+        """Detect Linux distribution and package manager"""
+        try:
+            # Try reading os-release file first
+            if os.path.exists("/etc/os-release"):
+                with open("/etc/os-release") as f:
+                    os_info = {}
+                    for line in f:
+                        if "=" in line:
+                            key, value = line.rstrip().split("=", 1)
+                            os_info[key] = value.strip('"')
+                    
+                    if "ID" in os_info:
+                        distro_id = os_info["ID"].lower()
+                        if distro_id in ["ubuntu", "debian", "linuxmint"]:
+                            return "debian", "apt"
+                        elif distro_id in ["fedora", "rhel", "centos"]:
+                            return "redhat", "dnf"
+                        elif distro_id in ["arch", "manjaro", "endeavouros", "garuda"]:
+                            return "arch", "pacman"
+                        elif distro_id in ["opensuse", "suse"]:
+                            return "suse", "zypper"
+            
+            # Fallback to checking specific files
+            if os.path.exists("/etc/debian_version"):
+                return "debian", "apt"
+            elif os.path.exists("/etc/fedora-release"):
+                return "redhat", "dnf"
+            elif os.path.exists("/etc/arch-release"):
+                return "arch", "pacman"
+            elif os.path.exists("/etc/SuSE-release"):
+                return "suse", "zypper"
+            
+            return "unknown", None
+        except:
+            return "unknown", None
+
     def get_installed_packages(self):
         table = Table(title="Installed Package Managers and Updates")
         table.add_column("Package Manager", style="cyan")
         table.add_column("Status", style="green")
         table.add_column("Updates Available", style="yellow")
         
-        # Check for different package managers
-        package_managers = {
-            "apt": "apt list --upgradable 2>/dev/null | wc -l",
-            "dnf": "dnf check-update --quiet | wc -l",
-            "pacman": "pacman -Qu | wc -l",
-            "zypper": "zypper list-updates | wc -l",
-            "yum": "yum check-update --quiet | wc -l"
-        }
-        
-        for pm, cmd in package_managers.items():
-            try:
-                if platform.system() == "Linux":
-                    # Check if package manager exists
-                    if subprocess.call(["which", pm], stdout=subprocess.DEVNULL) == 0:
-                        updates = subprocess.check_output(cmd, shell=True).decode().strip()
-                        table.add_row(pm, "Installed", updates)
+        if platform.system() == "Linux":
+            distro_family, pkg_manager = self.get_distro_info()
+            
+            # Package manager commands based on distribution
+            package_managers = {
+                "apt": {
+                    "updates": ["apt", "list", "--upgradable"],
+                    "fallback": ["dpkg", "--get-selections"],
+                    "needs_sudo": True,
+                    "parse": lambda x: len([l for l in x.split('\n') if '/' in l])  # Count only package lines
+                },
+                "dnf": {
+                    "updates": ["dnf", "check-update", "--quiet"],
+                    "fallback": ["rpm", "-qa"],
+                    "needs_sudo": True,
+                    "parse": lambda x: len([l for l in x.split('\n') if l.strip()])
+                },
+                "pacman": {
+                    "updates": ["pacman", "-Qu"],
+                    "fallback": ["pacman", "-Q"],
+                    "needs_sudo": False,
+                    "parse": lambda x: len([l for l in x.split('\n') if l.strip()])
+                },
+                "zypper": {
+                    "updates": ["zypper", "list-updates"],
+                    "fallback": ["rpm", "-qa"],
+                    "needs_sudo": True,
+                    "parse": lambda x: len([l for l in x.split('\n') if l.strip() and not l.startswith('[')])
+                }
+            }
+            
+            if pkg_manager in package_managers:
+                commands = package_managers[pkg_manager]
+                try:
+                    if commands.get("needs_sudo", False):
+                        success, output, _ = self.run_sudo_command(commands["updates"])
+                        if success:
+                            updates = commands["parse"](output.decode())
+                        else:
+                            # Try fallback without counting updates
+                            output = subprocess.check_output(
+                                commands["fallback"],
+                                stderr=subprocess.DEVNULL
+                            )
+                            packages = len(output.decode().strip().split('\n'))
+                            table.add_row(pkg_manager, f"Installed ({packages} packages)", "Unknown (no sudo)")
+                            return table
                     else:
-                        table.add_row(pm, "Not Installed", "N/A")
-            except:
-                continue
+                        output = subprocess.check_output(
+                            commands["updates"],
+                            stderr=subprocess.DEVNULL
+                        )
+                        updates = commands["parse"](output.decode())
+                    
+                    table.add_row(pkg_manager, "Installed", str(updates))
+                except Exception as e:
+                    # Try fallback command
+                    try:
+                        output = subprocess.check_output(
+                            commands["fallback"],
+                            stderr=subprocess.DEVNULL
+                        )
+                        packages = len(output.decode().strip().split('\n'))
+                        table.add_row(pkg_manager, f"Installed ({packages} packages)", "Unknown")
+                    except:
+                        table.add_row(pkg_manager, "Installed", "Error checking updates")
+            else:
+                table.add_row("Package Manager", f"Unknown distribution: {distro_family}", "N/A")
         
-        # Check for Windows Update (if on Windows)
-        if platform.system() == "Windows":
+        elif platform.system() == "Windows":
             try:
-                import wmi
-                c = wmi.WMI()
-                updates = c.Win32_QuickFixEngineering()
-                table.add_row("Windows Update", "Installed", str(len(updates)))
+                # Check for Windows Update using PowerShell
+                ps_cmd = "Get-WmiObject -Class Win32_QuickFixEngineering | Measure-Object | Select-Object -ExpandProperty Count"
+                updates = subprocess.check_output(["powershell", "-Command", ps_cmd], text=True).strip()
+                table.add_row("Windows Update", "Installed", updates)
+                
+                # Check for Windows Package Manager (winget)
+                try:
+                    subprocess.run(["winget", "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    updates = subprocess.check_output(["winget", "upgrade", "--count"], text=True).strip()
+                    table.add_row("Windows Package Manager", "Installed", updates)
+                except:
+                    pass
             except:
                 table.add_row("Windows Update", "Unable to check", "N/A")
+        
+        elif platform.system() == "Darwin":  # macOS
+            try:
+                # Check for Homebrew
+                brew_check = subprocess.run(["which", "brew"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                if brew_check.returncode == 0:
+                    updates = subprocess.check_output(["brew", "outdated", "--quiet"], text=True).count('\n')
+                    table.add_row("Homebrew", "Installed", str(updates))
+                
+                # Check for Mac App Store updates
+                mas_check = subprocess.run(["which", "mas"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                if mas_check.returncode == 0:
+                    updates = subprocess.check_output(["mas", "outdated"], text=True).count('\n')
+                    table.add_row("Mac App Store", "Installed", str(updates))
+            except:
+                table.add_row("Package Manager", "Unable to check", "N/A")
         
         return table
 
@@ -189,37 +327,96 @@ class SystemInfoViewer:
                             if line.startswith("SELINUX="):
                                 table.add_row("SELinux Status", line.split("=")[1].strip())
                 
-                # Check firewall status
-                firewall_cmds = [
-                    ("ufw", "ufw status"),
-                    ("firewalld", "firewall-cmd --state"),
-                    ("iptables", "iptables -L")
-                ]
+                # Get distro info to determine default firewall
+                distro_family, _ = self.get_distro_info()
                 
-                for fw, cmd in firewall_cmds:
+                # Define firewall checks based on distribution
+                firewall_checks = []
+                
+                # Check for installed firewalls silently first
+                if os.path.exists("/usr/sbin/ufw") or os.path.exists("/sbin/ufw"):
+                    firewall_checks.append(("UFW", ["ufw", "status"], "inactive"))
+                if os.path.exists("/usr/sbin/firewalld") or os.path.exists("/sbin/firewalld"):
+                    firewall_checks.append(("FirewallD", ["firewall-cmd", "--state"], "not running"))
+                
+                # Always check iptables last as a fallback
+                if os.path.exists("/usr/sbin/iptables") or os.path.exists("/sbin/iptables"):
+                    firewall_checks.append(("IPTables", ["iptables", "-L", "-n"], "no rules"))
+                
+                # If no firewalls detected, check distribution default
+                if not firewall_checks:
+                    if distro_family == "debian":
+                        table.add_row("Firewall", "UFW not installed")
+                    elif distro_family == "redhat":
+                        table.add_row("Firewall", "FirewallD not installed")
+                    elif distro_family == "arch":
+                        table.add_row("Firewall", "No firewall configured")
+                    else:
+                        table.add_row("Firewall", "No firewall detected")
+                    return table
+                
+                # Get sudo access once for all firewall checks
+                if not self.ensure_sudo():
+                    table.add_row("Firewall Status", "Cannot check (no sudo access)")
+                    return table
+                
+                firewall_found = False
+                for name, cmd, default in firewall_checks:
                     try:
-                        if subprocess.call(["which", fw], stdout=subprocess.DEVNULL) == 0:
-                            status = subprocess.check_output(cmd.split()).decode().strip()
-                            table.add_row(f"{fw} Status", status)
-                    except:
+                        success, output, _ = self.run_sudo_command(cmd)
+                        if success:
+                            if name == "UFW":
+                                status = "active" if "Status: active" in output.decode() else "inactive"
+                            elif name == "FirewallD":
+                                status = "running" if "running" in output.decode() else "not running"
+                            elif name == "IPTables":
+                                # Parse iptables output to determine if any rules exist
+                                iptables_output = output.decode().strip()
+                                if iptables_output and "Chain" in iptables_output:
+                                    status = "active with rules"
+                                else:
+                                    status = "active (no rules)"
+                            else:
+                                status = "active" if output else default
+                            
+                            table.add_row(f"{name} Status", status)
+                            firewall_found = True
+                    except Exception as e:
                         continue
-            except:
-                table.add_row("Security Info", "Unable to fetch")
+                
+                if not firewall_found:
+                    table.add_row("Firewall Status", "No active firewall detected")
+            
+            except Exception as e:
+                table.add_row("Security Info", "Unable to fetch security information")
         
         elif platform.system() == "Windows":
             try:
-                import wmi
-                c = wmi.WMI()
-                
-                # Check Windows Defender status
-                defender = c.Win32_Service(Name="WinDefend")[0]
-                table.add_row("Windows Defender", defender.State)
+                # Check Windows Defender status using PowerShell
+                ps_cmd = "Get-MpComputerStatus | Select-Object -ExpandProperty RealTimeProtectionEnabled"
+                defender_status = subprocess.check_output(["powershell", "-Command", ps_cmd], text=True).strip()
+                table.add_row("Windows Defender", "Enabled" if defender_status.lower() == "true" else "Disabled")
                 
                 # Check Windows Firewall status
-                firewall = c.Win32_Service(Name="MpsSvc")[0]
-                table.add_row("Windows Firewall", firewall.State)
+                ps_cmd = "Get-NetFirewallProfile | Select-Object -ExpandProperty Enabled"
+                firewall_status = subprocess.check_output(["powershell", "-Command", ps_cmd], text=True).strip()
+                table.add_row("Windows Firewall", "Enabled" if "True" in firewall_status else "Disabled")
             except:
-                table.add_row("Security Info", "Unable to fetch")
+                table.add_row("Security Info", "Unable to fetch Windows security information")
+        
+        elif platform.system() == "Darwin":  # macOS
+            try:
+                # Check macOS Firewall status
+                cmd = ["defaults", "read", "/Library/Preferences/com.apple.alf", "globalstate"]
+                firewall_status = subprocess.check_output(cmd, text=True).strip()
+                table.add_row("Firewall", "Enabled" if firewall_status != "0" else "Disabled")
+                
+                # Check System Integrity Protection (SIP)
+                cmd = ["csrutil", "status"]
+                sip_status = subprocess.check_output(cmd, text=True).strip()
+                table.add_row("System Integrity Protection", "Enabled" if "enabled" in sip_status.lower() else "Disabled")
+            except:
+                table.add_row("Security Info", "Unable to fetch macOS security information")
         
         return table
 
